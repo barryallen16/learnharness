@@ -106,6 +106,15 @@ export function parseClaudeCodeSettingsBody(body: unknown): SettingsBodyResult<{
 	return { ok: true, settings: { enabled: raw.enabled } };
 }
 
+/** opencodeCli: explicit app-wide opt-in. Empty section resets to off. */
+export function parseOpenCodeCliSettingsBody(body: unknown): SettingsBodyResult<{ enabled?: boolean }> {
+	const raw = asRecord(body);
+	if (!raw) return { ok: false, error: "Invalid JSON body" };
+	if (raw.enabled === undefined) return { ok: true, settings: {} };
+	if (typeof raw.enabled !== "boolean") return { ok: false, error: "enabled must be a boolean" };
+	return { ok: true, settings: { enabled: raw.enabled } };
+}
+
 /** agent.models: only the six known background roles; each override's
  *  fields mirror ChatSettings (model pair + independent thinkingLevel). */
 function parseRoleOverride(value: unknown, role: string): { ok: true; override: RoleModelOverride } | { ok: false; error: string } {
@@ -520,6 +529,13 @@ export const SETTINGS_SECTIONS = {
 	models: parseModelsSettingsBody,
 	dictation: parseDictationSettingsBody,
 	claudeCode: parseClaudeCodeSettingsBody,
+	opencodeCli: parseOpenCodeCliSettingsBody,
 } as const;
 
 export type SettingsSectionName = keyof typeof SETTINGS_SECTIONS;
+
+export function parseSettingsSectionBody(section: string, body: unknown): SettingsBodyResult<unknown> {
+	const parser = (SETTINGS_SECTIONS as Record<string, ((b: unknown) => SettingsBodyResult<unknown>) | undefined>)[section];
+	if (!parser) return { ok: false, error: `unknown settings section "${section}"` };
+	return parser(body);
+}
